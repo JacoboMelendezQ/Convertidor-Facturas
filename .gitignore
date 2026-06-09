@@ -1,0 +1,27 @@
+﻿# PyInstaller
+dist/
+build/
+*.spec
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Distribuible
+*.zip
+*.exe
+
+# Archivos temporales / debug
+*.tmp
+*.txt
+.DS_Store
+
+# Claude Code
+.claude/
+
+# PDFs de proveedores (datos privados)
+data/ejemplos_pdf/
+data/POR_PROCESAR/
+data/PROCESADOS/
+data/RESULTADOS/

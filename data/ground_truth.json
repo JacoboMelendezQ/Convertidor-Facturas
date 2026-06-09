@@ -1,0 +1,15 @@
+{
+  "_comment": "Filas de producto esperadas por PDF. Actualizar cuando se agregue un nuevo proveedor o se verifique manualmente un cambio de conteo.",
+  "AKT MOTOS":      { "filas": 1   },
+  "CHOHO FEBRERO":  { "filas": 133 },
+  "FEV04706":       { "filas": 27  },
+  "FR1214 MELENDEZ":{ "filas": 57  },
+  "FR1225":         { "filas": 49  },
+  "ha888":          { "filas": 3   },
+  "JAPAN":          { "filas": 48  },
+  "HJM #359":       { "filas": 55  },
+  "osaka.pdf":      { "filas": 2   },
+  "osaka2":         { "filas": 33  },
+  "omniparts":      { "filas": 88  },
+  "SAIMRAM":        { "filas": 47  }
+}
