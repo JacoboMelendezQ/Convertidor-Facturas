@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 7 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
+**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 12 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
 
 Main entry point: `main.py`
 
 ## REGLA OBLIGATORIA: Verificación Automática
 
-> **NUNCA reportar éxito de un fix hasta ver 8/8 PASSED.**
+> **NUNCA reportar éxito de un fix hasta ver 12/12 PASSED.**
 
 Después de **CUALQUIER** cambio en `auto_detector.py` o `cleaner.py`:
 
@@ -21,7 +21,7 @@ python scripts/verify.py
 Protocolo:
 1. Ejecutar `python scripts/verify.py`
 2. Si algún test falla → corregir el código y volver al paso 1
-3. Solo cuando la salida muestre **8/8 PASSED** → reportar éxito al usuario
+3. Solo cuando la salida muestre **12/12 PASSED** → reportar éxito al usuario
 
 El script valida por cada PDF:
 - Conteo de filas coincide con `data/ground_truth.json`
@@ -93,7 +93,7 @@ data/
   POR_PROCESAR/    # Watched input folder
   PROCESADOS/      # Archive of processed PDFs
   RESULTADOS/      # Output Excel files
-  ejemplos_pdf/    # Reference PDFs for testing (7 suppliers)
+  ejemplos_pdf/    # Reference PDFs for testing (12 suppliers)
 src/
   parsers/
     auto_detector.py   # Universal table extractor
@@ -124,14 +124,18 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 
 | Supplier | Example file |
 |----------|-------------|
-| FEV | `FEV04706.pdf` |
-| JAPAN | `JAPAN PENDIENTE DESCUENTO Orden_de_venta_S05177 (1).pdf` |
-| CHOHO | `CHOHO FEBRERO (1).pdf` |
-| FR / REPREFIL | `FR1214 MELENDEZ.pdf`, `FR1225.pdf` |
-| HA / HABICICLETS | `ha8888888888888888888.pdf` |
 | AKT MOTOS | `AKT MOTOS ad0890900943006260041C421 (1).pdf` |
-| DISTRI JYG | `ENER MELENDEZ ALMACEN HJM #359 (1).pdf` |
-| ROKO / SIESA | *(no example PDF in repo)* |
+| CHOHO | `CHOHO FEBRERO (1).pdf` |
+| FEV | `FEV04706.pdf` |
+| FR / REPREFIL (formato 1) | `FR1214 MELENDEZ.pdf` |
+| FR / REPREFIL (formato 2) | `FR1225.pdf` |
+| HA / HABICICLETS | `ha8888888888888888888.pdf` |
+| JAPAN RACER | `JAPAN PENDIENTE DESCUENTO Orden_de_venta_S05177 (1).pdf` |
+| DISTRI JYG / ENER | `ENER MELENDEZ ALMACEN HJM #359 (1).pdf` |
+| OSAKA (formato 1) | `osaka.pdf` |
+| OSAKA (formato 2) | `osaka2.pdf` |
+| OMNIPARTS | `omniparts.pdf` |
+| SAI RAM | `SAIMRAM.pdf` |
 
 ## Key Functions
 
@@ -143,7 +147,7 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 - `parse_number(val)` — disambiguates COP format (`1.234,56`) vs USA (`1,234.56`).
 - `process_pdf(pdf_path, results_dir, processed_dir, callback)` — orchestrates extract → save → move; calls `callback(msg)` for GUI log updates.
 
-## Known Issues (as of 2026-05-31)
+## Known Issues (as of 2026-06-15)
 
 - **Terminal display of accented chars** — `Ó`, `Á`, `É` appear as `?` in Windows bash/cmd terminal output. This is a terminal rendering artifact only; the Python strings and Excel cells contain correct Unicode (U+00D3, U+00C1, etc.). Open the xlsx in Excel to confirm correct accents.
 - **CHOHO/FR/JAPAN: page-header rows in intermediate list** — running headers (company address, phone, customer info) pass `_looks_like_product()` and enter the row accumulator, but are correctly removed by `_filter_product_rows` before writing to Excel. Final output is clean.
