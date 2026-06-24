@@ -508,29 +508,54 @@ def _clean_und_artifacts(headers: list, rows: list) -> list:
     desc_col = next((h for h in headers if 'descripcion' in normalize_text(h)), None)
     if not desc_col:
         return rows
+    # Detecta palabras con marcadores de artefacto n/d entre mayúsculas
+    _contam = re.compile(r'[A-Z][nd][A-Z]')
     new_rows = []
     for row in rows:
         desc = row.get(desc_col, '').strip()
         if not desc:
             new_rows.append(row)
             continue
+        # Paso 0: en palabras con marcadores de artefacto (n/d entre mayúsculas),
+        # eliminar también la U mayúscula atrapada entre dos mayúsculas.
+        # Aplicar ANTES de que las reglas siguientes eliminen los marcadores n/d.
+        # Ej: '10MM/AUBAnJdO.' → '10MM/ABAnJdO.' (el AnJ confirma artefacto; AU→A)
+        desc = ' '.join(
+            re.sub(r'(?<=[A-Z])U(?=[A-Z])', '', w) if _contam.search(w) else w
+            for w in desc.split()
+        )
+        # Eliminar U al final de secuencia ≥2 mayúsculas antes de separador
+        # Ej: 'C100BIZU/' → 'C100BIZ/' (sin \b, funciona aunque preceda dígito)
+        desc = re.sub(r'([A-Z]{2,})U(?=[/\-\(\s]|$)', r'\1', desc)
+        # Eliminar U solitaria antes de '$' o '(' (ej. U$SET → $SET, U(SAI) → (SAI))
+        desc = re.sub(r'\bU(?=[$\(])', '', desc)
         # U seguida de mayúscula + 'n' minúscula → artefacto específico de 'Und.'
-        # Más estricto que "U entre mayúsculas" para no tocar palabras legítimas como CUADRADO.
         desc = re.sub(r'(?<=[A-Z])[Uu](?=[A-Z][nN])', '', desc)
-        # n minúscula entre dos letras mayúsculas → artefacto de 'und.' (n=u en codificación)
-        desc = re.sub(r'(?<=[A-Z])n(?=[A-Z])', '', desc)
+        # n minúscula después de mayúscula antes de mayúscula, / - o espacio → artefacto
+        desc = re.sub(r'(?<=[A-Z])n(?=[A-Z/\-\s]|$)', '', desc)
         # d minúscula + punto opcional después de mayúscula → artefacto 'd.' de 'Und.'
         desc = re.sub(r'(?<=[A-Z])d\.?(?=[A-Z\s]|$)', '', desc)
-        # Punto embebido entre dos mayúsculas → artefacto del punto de 'Und.'
-        desc = re.sub(r'(?<=[A-Z])\.(?=[A-Z])', '', desc)
+        # Punto embebido después de mayúscula antes de mayúscula o dígito → artefacto
+        # Ej: 'C.90' → 'C90', 'S.T' → 'ST'
+        desc = re.sub(r'(?<=[A-Z])\.(?=[A-Z\d])', '', desc)
+        # Punto espurio al inicio de token numérico (espacio + punto + dígito)
+        # Ej: ' .10MM' → ' 10MM'
+        desc = re.sub(r'(?<=\s)\.(?=\d)', '', desc)
+        # d minúscula después de separador (/ - ( espacio) antes de mayúscula → artefacto
+        # Ej: '/dC' → '/C', '(dSAI' → '(SAI'
+        desc = re.sub(r'(?<=[/\-\(\s])d(?=[A-Z])', '', desc)
+        # Punto después de '$' o '(' antes de mayúscula → artefacto (ej. $.SET → $SET)
+        desc = re.sub(r'(?<=[$\(])\.(?=[A-Z])', '', desc)
         # U mayúscula al final de una palabra en mayúsculas → artefacto 'U' de 'Und.'
         desc = re.sub(r'\b([A-Z]+)[Uu]\b', r'\1', desc)
         # n/d interleados dentro de secuencias de dígitos (ej. '1n0d'→'10')
         desc = re.sub(r'(?<=\d)[nd](?=[\d\s]|$)', '', desc)
+        # Punto residual al final de palabra (después de mayúscula o ')') antes de espacio/fin
+        # Ej: '(SAI).' → '(SAI)', '$SET.' → '$SET'
+        desc = re.sub(r'(?<=[A-Z\)])\.(?=\s|$)', '', desc)
         # Período residual al final de palabras largas en mayúsculas (≥4 letras)
         desc = re.sub(r'([A-Z]{4,})\.(?=\s|$)', r'\1', desc)
         # 'n' inicial antes de secuencia en mayúsculas → remanente de limpieza de 'nEdN.'
-        # Ej: "nEN." → "EN" (el 'n' es el artefacto de la 'u' en la capa Und.)
         desc = re.sub(r'\bn([A-Z]{2,})\.?(?=\s|$)', r'\1', desc)
         # Eliminar tokens 'Und.' sueltos que no van precedidos de '$'
         desc = re.sub(r'(?<!\$)\s*\bUnd\.?\b\s*', ' ', desc, flags=re.IGNORECASE)
@@ -657,11 +682,15 @@ def _merge_fragmented_headers(headers: list, rows: list) -> tuple:
     merge_into_prev = set()
     for i, h in enumerate(headers[1:], start=1):
         norm = normalize_text(h).strip()
+        norm_parts = norm.split()
         if norm in _CONNECTORS:
             merge_into_prev.add(i)
             # Also pull in the noun that completes the prepositional phrase
             if i + 1 < len(headers):
                 merge_into_prev.add(i + 1)
+        elif len(norm_parts) > 1 and norm_parts[0] in _CONNECTORS:
+            # "DE PRODUCTO" as single cell → merge into previous column
+            merge_into_prev.add(i)
 
     if not merge_into_prev:
         return headers, rows
@@ -945,11 +974,17 @@ def _assign_to_columns(line_words: list, columns: list) -> dict:
             continue
         # Tokens que empiezan en minúscula, contienen mayúsculas Y NO comienzan con
         # un signo de puntuación son artefactos del PDF de doble capa.
-        # Excepción: tokens como "nEdN." se dejan pasar para que _clean_und_artifacts
+        # Excepción 1: tokens como "nEdN." se dejan pasar para que _clean_und_artifacts
         # recupere las letras reales (ej. "EN") que llevan interleadas.
-        if (len(text) >= 3 and text[0].islower() and any(c.isupper() for c in text)
-                and not re.match(r'^[nNeE][a-zA-Z]+[nNeEdD]\.?$', text)):
-            continue
+        # Excepción 2: 'n' artefacto antes de '(' real (ej. 'n(AdR.RIBA' → '(ARRIBA'):
+        # se descarta solo la 'n' inicial; el resto lo limpia _clean_und_artifacts.
+        if len(text) >= 3 and text[0].islower() and any(c.isupper() for c in text):
+            if re.match(r'^[nNeE][a-zA-Z]+[nNeEdD]\.?$', text):
+                pass  # excepción 1: artefacto recuperable
+            elif re.match(r'^n\(', text):
+                text = text[1:]  # excepción 2: quitar 'n' artefacto, conservar '(…'
+            else:
+                continue
         cx = (w['x0'] + w['x1']) / 2
         best = None
         best_dist = float('inf')
