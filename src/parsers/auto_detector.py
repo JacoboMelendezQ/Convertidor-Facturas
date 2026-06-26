@@ -535,9 +535,10 @@ def _clean_und_artifacts(headers: list, rows: list) -> list:
         desc = re.sub(r'(?<=[A-Z])n(?=[A-Z/\-\s]|$)', '', desc)
         # d minúscula + punto opcional después de mayúscula → artefacto 'd.' de 'Und.'
         desc = re.sub(r'(?<=[A-Z])d\.?(?=[A-Z\s]|$)', '', desc)
-        # Punto embebido después de mayúscula antes de mayúscula o dígito → artefacto
+        # Punto embebido después de UNA SOLA mayúscula antes de mayúscula o dígito → artefacto
         # Ej: 'C.90' → 'C90', 'S.T' → 'ST'
-        desc = re.sub(r'(?<=[A-Z])\.(?=[A-Z\d])', '', desc)
+        # Excluir si hay ≥2 mayúsculas antes del punto (ej. 'TELES.CR5' es nombre real).
+        desc = re.sub(r'(?<![A-Z][A-Z])(?<=[A-Z])\.(?=[A-Z\d])', '', desc)
         # Punto espurio al inicio de token numérico (espacio + punto + dígito)
         # Ej: ' .10MM' → ' 10MM'
         desc = re.sub(r'(?<=\s)\.(?=\d)', '', desc)
@@ -962,16 +963,16 @@ def _extend_with_subheader(cols: list, sub_words: list):
 
 
 def _assign_to_columns(line_words: list, columns: list) -> dict:
+    _UNIT_COL_NORMS = frozenset({'unidad', 'u.m', 'u m', 'um', 'u/m'})
+    unit_col_names = {col['name'] for col in columns
+                      if normalize_text(col['name']).rstrip('.') in _UNIT_COL_NORMS}
+
     buckets = {col['name']: [] for col in columns}
     for w in line_words:
         text = w['text'].strip('|').strip()
         if not text or text in ('*', '—', '-'):
             continue
-        # Filtrar tokens "Und." (y variantes) antes de la concatenación — evita que
-        # aparezcan solos en la descripción o se mezclen con tokens adyacentes.
         nt = normalize_text(text).rstrip('.')
-        if nt in ('und', 'unid', 'unidad', 'unidades'):
-            continue
         # Tokens que empiezan en minúscula, contienen mayúsculas Y NO comienzan con
         # un signo de puntuación son artefactos del PDF de doble capa.
         # Excepción 1: tokens como "nEdN." se dejan pasar para que _clean_und_artifacts
@@ -996,8 +997,13 @@ def _assign_to_columns(line_words: list, columns: list) -> dict:
             if dist < best_dist:
                 best_dist = dist
                 best = col
-        if best:
-            buckets[best['name']].append(text)
+        if best is None:
+            continue
+        # Filtrar tokens "Und." (y variantes) solo cuando NO van al campo de unidad de
+        # medida — evita que aparezcan en descripción/código, pero los conserva en U.M.
+        if nt in ('und', 'unid', 'unidad', 'unidades') and best['name'] not in unit_col_names:
+            continue
+        buckets[best['name']].append(text)
     return {k: ' '.join(v) for k, v in buckets.items()}
 
 
