@@ -495,7 +495,7 @@ def _fix_unit_overflow(headers: list, rows: list) -> list:
     return new_rows
 
 
-_TRAILING_UNIT_RE = re.compile(r'\s+\bUnd\.?\s*$', re.IGNORECASE)
+_TRAILING_UNIT_RE = re.compile(r'\s+\bUnd\.\s*$', re.IGNORECASE)
 
 
 def _clean_und_artifacts(headers: list, rows: list) -> list:
@@ -559,7 +559,7 @@ def _clean_und_artifacts(headers: list, rows: list) -> list:
         # 'n' inicial antes de secuencia en mayúsculas → remanente de limpieza de 'nEdN.'
         desc = re.sub(r'\bn([A-Z]{2,})\.?(?=\s|$)', r'\1', desc)
         # Eliminar tokens 'Und.' sueltos que no van precedidos de '$'
-        desc = re.sub(r'(?<!\$)\s*\bUnd\.?\b\s*', ' ', desc, flags=re.IGNORECASE)
+        desc = re.sub(r'(?<!\$)\s*\bUnd\.\s*', ' ', desc, flags=re.IGNORECASE)
         desc = re.sub(r'\s+', ' ', desc).strip()
         if desc != row.get(desc_col, '').strip():
             row = dict(row)
@@ -735,6 +735,13 @@ def _find_best_table(tables: list):
     best = None
     for table in tables:
         for i, row in enumerate(table):
+            # Skip rows where ≥50% of cells are None/empty — signal of a fused page-header
+            # cell (e.g. JAPAN FACTURA ELECTRONICA pages 2-10: company info + column names
+            # are merged into one cell, all other cells are None).
+            if row:
+                none_count = sum(1 for c in row if c is None or str(c).strip() == '')
+                if none_count / len(row) >= 0.5:
+                    continue
             score = _score_header(row)
             if score > best_score and score >= 3:
                 best_score = score
@@ -1116,6 +1123,54 @@ def _extract_by_words(page, existing_cols=None):
     return headers, rows, columns
 
 
+def _normalize_impuestos(headers: list, rows: list) -> list:
+    """
+    Normaliza la columna IMPUESTOS: '19%, ., .' → '19%'.
+    El PDF JAPAN FACTURA ELECTRONICA imprime el IVA seguido de
+    marcadores de campos vacíos (, .) que deben eliminarse.
+    """
+    tax_cols = [h for h in headers if 'impuest' in normalize_text(h)]
+    if not tax_cols:
+        return rows
+    new_rows = []
+    for row in rows:
+        row = dict(row)
+        for h in tax_cols:
+            val = row.get(h, '').strip()
+            m = re.match(r'^(\d+(?:[.,]\d+)?%)', val)
+            if m and val != m.group(1):
+                row[h] = m.group(1)
+        new_rows.append(row)
+    return new_rows
+
+
+def _round_price_columns(headers: list, rows: list) -> list:
+    """
+    Redondea a 2 decimales los precios en formato COP con >2 decimales.
+    Ej: '12.480,4276' → '12.480,43'.
+    Solo afecta valores sin prefijo '$' (PRECIO SIN IVA).
+    """
+    from src.utils.cleaner import parse_number as _pn
+    price_cols = [h for h in headers if classify_column(h) == 'price']
+    if not price_cols:
+        return rows
+    new_rows = []
+    for row in rows:
+        row = dict(row)
+        for h in price_cols:
+            val = row.get(h, '').strip()
+            # Solo procesar valores COP sin $ que tengan >2 dígitos decimales
+            if re.match(r'^[\d.]+,\d{3,}$', val):
+                num = _pn(val)
+                if num > 0:
+                    rounded = round(num, 2)
+                    parts = f'{rounded:.2f}'.split('.')
+                    int_str = f'{int(parts[0]):,}'.replace(',', '.')
+                    row[h] = f'{int_str},{parts[1]}'
+        new_rows.append(row)
+    return new_rows
+
+
 # ──────────────────────────────────────────────────────────────
 # Función principal
 # ──────────────────────────────────────────────────────────────
@@ -1158,6 +1213,11 @@ def extract_from_pdf(pdf_path: str) -> tuple[list, list]:
                             if not _looks_like_product(row_text):
                                 continue
                             if _FOOTER_RE.search(row_text):
+                                continue
+                            # FIX 1: Skip repeated column-header rows
+                            # (e.g. JAPAN FACTURA ELECTRONICA: header repeats on each page)
+                            if (normalize_text(vals[0]).startswith('descripci')
+                                    and not any(c.isdigit() for c in row_text)):
                                 continue
                             row_dict = {h: (vals[i] if i < len(vals) else '')
                                         for i, h in enumerate(all_headers)}
@@ -1217,4 +1277,6 @@ def extract_from_pdf(pdf_path: str) -> tuple[list, list]:
     clean_rows = _clean_und_artifacts(valid, clean_rows)
     clean_rows = _strip_trailing_units(valid, clean_rows)
     clean_rows = _split_code_description(valid, clean_rows)
+    clean_rows = _normalize_impuestos(valid, clean_rows)
+    clean_rows = _round_price_columns(valid, clean_rows)
     return valid, clean_rows

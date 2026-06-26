@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 12 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
+**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 13 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
 
 Main entry point: `main.py`
 
@@ -23,7 +23,7 @@ Protocolo:
 2. Si algún test falla → corregir el código y volver al paso 1
 3. Solo cuando la salida muestre **12/12 PASSED** → reportar éxito al usuario
 
-El script valida por cada PDF:
+El script valida por cada PDF (actualmente 13 PDFs, 13/13 PASSED):
 - Conteo de filas coincide con `data/ground_truth.json`
 - Sin texto basura (CCLL, FECHA EXPEDICION, JAPAN Y RACING, etc.)
 - Sin descripciones vacías
@@ -130,7 +130,8 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 | FR / REPREFIL (formato 1) | `FR1214 MELENDEZ.pdf` |
 | FR / REPREFIL (formato 2) | `FR1225.pdf` |
 | HA / HABICICLETS | `ha8888888888888888888.pdf` |
-| JAPAN RACER | `JAPAN PENDIENTE DESCUENTO Orden_de_venta_S05177 (1).pdf` |
+| JAPAN RACER (formato 1, Orden de Venta) | `JAPAN PENDIENTE DESCUENTO Orden_de_venta_S05177 (1).pdf` |
+| JAPAN RACER (formato 2, Factura Electrónica) | `JAPAN FACTURA ELECTRONICA.pdf` |
 | DISTRI JYG / ENER | `ENER MELENDEZ ALMACEN HJM #359 (1).pdf` |
 | OSAKA (formato 1) | `osaka.pdf` |
 | OSAKA (formato 2) | `osaka2.pdf` |
