@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 13 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
+**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 14 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
 
 Main entry point: `main.py`
 
@@ -23,7 +23,7 @@ Protocolo:
 2. Si algún test falla → corregir el código y volver al paso 1
 3. Solo cuando la salida muestre **12/12 PASSED** → reportar éxito al usuario
 
-El script valida por cada PDF (actualmente 13 PDFs, 13/13 PASSED):
+El script valida por cada PDF (actualmente 14 PDFs, 14/14 PASSED):
 - Conteo de filas coincide con `data/ground_truth.json`
 - Sin texto basura (CCLL, FECHA EXPEDICION, JAPAN Y RACING, etc.)
 - Sin descripciones vacías
@@ -93,7 +93,7 @@ data/
   POR_PROCESAR/    # Watched input folder
   PROCESADOS/      # Archive of processed PDFs
   RESULTADOS/      # Output Excel files
-  ejemplos_pdf/    # Reference PDFs for testing (12 suppliers)
+  ejemplos_pdf/    # Reference PDFs for testing (14 suppliers)
 src/
   parsers/
     auto_detector.py   # Universal table extractor
@@ -137,6 +137,7 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 | OSAKA (formato 2) | `osaka2.pdf` |
 | OMNIPARTS | `omniparts.pdf` |
 | SAI RAM | `SAIMRAM.pdf` |
+| FANALCA / Fábrica Nacional de Autopartes | `FANALCA JUNIO 26..pdf` |
 
 ## Key Functions
 
@@ -148,7 +149,7 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 - `parse_number(val)` — disambiguates COP format (`1.234,56`) vs USA (`1,234.56`).
 - `process_pdf(pdf_path, results_dir, processed_dir, callback)` — orchestrates extract → save → move; calls `callback(msg)` for GUI log updates.
 
-## Known Issues (as of 2026-06-15)
+## Known Issues (as of 2026-06-29)
 
 - **Terminal display of accented chars** — `Ó`, `Á`, `É` appear as `?` in Windows bash/cmd terminal output. This is a terminal rendering artifact only; the Python strings and Excel cells contain correct Unicode (U+00D3, U+00C1, etc.). Open the xlsx in Excel to confirm correct accents.
 - **CHOHO/FR/JAPAN: page-header rows in intermediate list** — running headers (company address, phone, customer info) pass `_looks_like_product()` and enter the row accumulator, but are correctly removed by `_filter_product_rows` before writing to Excel. Final output is clean.
