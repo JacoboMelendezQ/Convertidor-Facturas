@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=82.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "agente-facturas"
+version = "3.0.0"
+description = "Conversor universal de facturas PDF a Excel"
+authors = [
+    { name = "Jacobo Meléndez", email = "jacobolucho@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pdfplumber==0.11.10",
+    "openpyxl==3.1.5",
+    "watchdog==6.0.0",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller==6.21.0",
+]
+
+[project.scripts]
+agente-facturas = "main:main"

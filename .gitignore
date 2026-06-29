@@ -14,8 +14,10 @@ __pycache__/
 
 # Archivos temporales / debug
 *.tmp
-*.txt
 .DS_Store
+
+# Entorno virtual
+.venv/
 
 # Claude Code
 .claude/
