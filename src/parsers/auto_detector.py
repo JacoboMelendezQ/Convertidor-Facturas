@@ -1172,6 +1172,63 @@ def _round_price_columns(headers: list, rows: list) -> list:
 
 
 # ──────────────────────────────────────────────────────────────
+# Extractor dedicado: FANALCA (Fábrica Nacional de Autopartes)
+# ──────────────────────────────────────────────────────────────
+
+_FANALCA_DETECT_RE = re.compile(r'890301886')
+_FANALCA_HEADERS = [
+    'REFERENCIA', 'DETALLE', 'U.M.', 'CANT',
+    'VR. UNITARIO', '%DESCUENTO', 'VALOR TOTAL', '%IVA',
+]
+# Pattern: FO-<order> <REF> <DETALLE> <UM> <CANT> $ <PRICE> [<PCT>] $ <TOTAL> <IVA>
+_FANALCA_ROW_RE = re.compile(
+    r'^FO-\S+\s+'
+    r'(\S+)\s+'
+    r'(.+?)\s+(UND|KLS|UNI|PAR|JGO|BOL|KG|MTS?)\s+'
+    r'(\d+)\s+'
+    r'\$\s*([\d,]+\.\d+)\s+'
+    r'(?:([\d.]+)\s+)?'
+    r'\$\s*([\d,]+\.\d+)\s+'
+    r'(\d+)\s*$'
+)
+
+
+def _extract_fanalca(lines: list) -> tuple[list, list]:
+    """Extractor dedicado para FANALCA (NIT 890301886).
+    Formato de fila: FO-<orden> REF DETALLE UM CANT $ VR_UNIT [%DESC] $ TOTAL IVA
+    """
+    rows = []
+    in_data = False
+    for line in lines:
+        line = line.strip()
+        m = _FANALCA_ROW_RE.match(line)
+        if m:
+            in_data = True
+            ref, detalle, um, cant, vr_unit, pct_desc, valor_total, pct_iva = m.groups()
+            rows.append({
+                'REFERENCIA': ref,
+                'DETALLE': detalle.strip(),
+                'U.M.': um,
+                'CANT': cant,
+                'VR. UNITARIO': vr_unit,
+                '%DESCUENTO': pct_desc.strip() if pct_desc else '',
+                'VALOR TOTAL': valor_total,
+                '%IVA': pct_iva,
+            })
+        elif in_data and rows and line:
+            # Multi-line DETALLE continuation (e.g. "CB110/CB125F/WAVE", "DLX")
+            if ('$' not in line
+                    and re.search(r'[A-Za-z]', line)
+                    and len(line) < 60
+                    and not re.search(
+                        r'(CREDITO|TOTAL\b|DIAN|AUTORIZACI|TRANSPORTADORA|BANCO|VIGENCIA|RANGO|FECHA\b)',
+                        line, re.IGNORECASE,
+                    )):
+                rows[-1]['DETALLE'] = (rows[-1]['DETALLE'] + ' ' + line).strip()
+    return _FANALCA_HEADERS, rows
+
+
+# ──────────────────────────────────────────────────────────────
 # Función principal
 # ──────────────────────────────────────────────────────────────
 
@@ -1186,6 +1243,19 @@ def extract_from_pdf(pdf_path: str) -> tuple[list, list]:
 
     try:
         with pdfplumber.open(pdf_path) as pdf:
+            # ── FANALCA: extractor dedicado (detectado por NIT 890301886) ──
+            if pdf.pages:
+                _ft = pdf.pages[0].extract_text() or ''
+                if _FANALCA_DETECT_RE.search(_ft):
+                    _lines = []
+                    for _p in pdf.pages:
+                        _t = _p.extract_text()
+                        if _t:
+                            _lines.extend(_t.split('\n'))
+                    _fh, _fr = _extract_fanalca(_lines)
+                    if _fr:
+                        return _fh, _fr
+
             for page in pdf.pages:
                 page_headers = None
                 page_rows = []

@@ -12,5 +12,6 @@
   "osaka.pdf":      { "filas": 2   },
   "osaka2":         { "filas": 33  },
   "omniparts":      { "filas": 88  },
-  "SAIMRAM":        { "filas": 47  }
+  "SAIMRAM":        { "filas": 47  },
+  "FANALCA":        { "filas": 11  }
 }
