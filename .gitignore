@@ -15,6 +15,7 @@ __pycache__/
 # Archivos temporales / debug
 *.tmp
 .DS_Store
+pdf_extract_output.txt
 
 # Entorno virtual
 .venv/
