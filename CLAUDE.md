@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 14 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
+**Agente Facturas V3** is a Python Windows desktop application with a Tkinter GUI that processes PDF invoices from 15 suppliers, extracts product line-items using a universal table detector, and outputs formatted Excel files.
 
 Main entry point: `main.py`
 
 ## REGLA OBLIGATORIA: Verificación Automática
 
-> **NUNCA reportar éxito de un fix hasta ver 12/12 PASSED.**
+> **NUNCA reportar éxito de un fix hasta ver 15/15 PASSED.**
 
 Después de **CUALQUIER** cambio en `auto_detector.py` o `cleaner.py`:
 
@@ -21,9 +21,9 @@ python scripts/verify.py
 Protocolo:
 1. Ejecutar `python scripts/verify.py`
 2. Si algún test falla → corregir el código y volver al paso 1
-3. Solo cuando la salida muestre **12/12 PASSED** → reportar éxito al usuario
+3. Solo cuando la salida muestre **15/15 PASSED** → reportar éxito al usuario
 
-El script valida por cada PDF (actualmente 14 PDFs, 14/14 PASSED):
+El script valida por cada PDF (actualmente 15 PDFs, 15/15 PASSED):
 - Conteo de filas coincide con `data/ground_truth.json`
 - Sin texto basura (CCLL, FECHA EXPEDICION, JAPAN Y RACING, etc.)
 - Sin descripciones vacías
@@ -93,7 +93,7 @@ data/
   POR_PROCESAR/    # Watched input folder
   PROCESADOS/      # Archive of processed PDFs
   RESULTADOS/      # Output Excel files
-  ejemplos_pdf/    # Reference PDFs for testing (14 suppliers)
+  ejemplos_pdf/    # Reference PDFs for testing (15 suppliers)
 src/
   parsers/
     auto_detector.py   # Universal table extractor
@@ -138,6 +138,10 @@ Merged/fused cells detected and rejected (falls back to strategy 2).
 | OMNIPARTS | `omniparts.pdf` |
 | SAI RAM | `SAIMRAM.pdf` |
 | FANALCA / Fábrica Nacional de Autopartes | `FANALCA JUNIO 26..pdf` |
+| CORBETA / AKT MOTOS (layout 2, NIT 890900943 compartido con AKT) | `CORBETA JUNIO 28.pdf` |
+
+> **CORBETA columnas:** `PLU | CODIGO-EAN13 | DESCRIPCION | TOTAL UNIDADES | Vr | %DESC | SUBTOTAL | %IVA | Vr. TOTAL`
+> Detectado por NIT `890900943` + líneas con prefijo `N|` (layout distinto al AKT original de 1 fila).
 
 ## Key Functions
 
