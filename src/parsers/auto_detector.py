@@ -1172,6 +1172,57 @@ def _round_price_columns(headers: list, rows: list) -> list:
 
 
 # ──────────────────────────────────────────────────────────────
+# Extractor dedicado: CORBETA (AKT layout con prefijo N| por ítem)
+# ──────────────────────────────────────────────────────────────
+
+_CORBETA_DETECT_RE = re.compile(r'890[\s.]?900[\s.]?943')
+_CORBETA_LINE_RE = re.compile(r'^\d+\|', re.MULTILINE)
+_CORBETA_HEADERS = [
+    'PLU', 'CODIGO-EAN13', 'DESCRIPCION', 'TOTAL UNIDADES',
+    'Vr', '%DESC', 'SUBTOTAL', '%IVA', 'Vr. TOTAL',
+]
+# Row format: N| PLU CODIGO DESCRIPCION Rp CAJAS UND TOTAL UND Vr DESC [RECARG] SUBTOTAL IVA% VrIVA 0.0 0.0 VrTOTAL
+# PLU may contain spaces; CODIGO is a 13-digit EAN or a letter-prefixed alphanumeric code ≥9 chars.
+_CORBETA_ROW_RE = re.compile(
+    r'^\d+\|\s+'
+    r'(.*?)\s+'                              # PLU (lazy, may have spaces)
+    r'(\d{13}|[A-Z][0-9A-Z]{7,}[0-9A-Z])\s+'  # CODIGO-EAN13
+    r'(.+?)\s*Rp\s+'                         # DESCRIPCION (before Rp, may be attached)
+    r'[\d.,]+\s+UND\s+'                      # CAJAS Y/O BOX (skip)
+    r'([\d.,]+)\s+UND\s+'                    # TOTAL UNIDADES
+    r'([\d.,]+)\s+'                          # Vr
+    r'([\d.]+)\s+'                           # %DESC
+    r'(?:[\d.]+\s+)?'                        # RECARG (optional, skip)
+    r'([\d.,]+)\s+'                          # SUBTOTAL
+    r'(\d+%)\s+'                             # %IVA
+    r'[\d.,]+\s+[\d.]+\s+[\d.]+\s+'         # Vr.IVA + 0.0 + 0.0 (skip)
+    r'([\d.,]+)\s*$'                         # Vr. TOTAL
+)
+
+
+def _extract_corbeta(lines: list) -> tuple[list, list]:
+    """Extractor dedicado para CORBETA / AKT con layout N| (NIT 890900943)."""
+    rows = []
+    for line in lines:
+        m = _CORBETA_ROW_RE.match(line.strip())
+        if not m:
+            continue
+        plu, codigo, desc, total_und, vr, pct_desc, subtotal, pct_iva, vr_total = m.groups()
+        rows.append({
+            'PLU': plu,
+            'CODIGO-EAN13': codigo,
+            'DESCRIPCION': desc.strip(),
+            'TOTAL UNIDADES': total_und,
+            'Vr': vr,
+            '%DESC': pct_desc,
+            'SUBTOTAL': subtotal,
+            '%IVA': pct_iva,
+            'Vr. TOTAL': vr_total,
+        })
+    return _CORBETA_HEADERS, rows
+
+
+# ──────────────────────────────────────────────────────────────
 # Extractor dedicado: FANALCA (Fábrica Nacional de Autopartes)
 # ──────────────────────────────────────────────────────────────
 
@@ -1243,9 +1294,22 @@ def extract_from_pdf(pdf_path: str) -> tuple[list, list]:
 
     try:
         with pdfplumber.open(pdf_path) as pdf:
-            # ── FANALCA: extractor dedicado (detectado por NIT 890301886) ──
+            # ── Extractores dedicados: CORBETA y FANALCA ─────────────────
             if pdf.pages:
                 _ft = pdf.pages[0].extract_text() or ''
+
+                # CORBETA: AKT layout con prefijo N| (NIT 890900943)
+                if _CORBETA_DETECT_RE.search(_ft) and _CORBETA_LINE_RE.search(_ft):
+                    _lines = []
+                    for _p in pdf.pages:
+                        _t = _p.extract_text()
+                        if _t:
+                            _lines.extend(_t.split('\n'))
+                    _ch, _cr = _extract_corbeta(_lines)
+                    if _cr:
+                        return _ch, _cr
+
+                # FANALCA: extractor dedicado (NIT 890301886)
                 if _FANALCA_DETECT_RE.search(_ft):
                     _lines = []
                     for _p in pdf.pages:

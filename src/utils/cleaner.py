@@ -81,8 +81,8 @@ def parse_percentage(val) -> float:
 def classify_column(name: str) -> str:
     """Retorna 'price', 'qty', 'pct', o 'text' según el nombre de columna."""
     n = normalize_text(str(name))
-    if any(kw in n for kw in ['precio', 'valor', 'total', 'importe', 'subtotal',
-                               'vr.', ' vr', 'monto', 'vlr', 'unitari']):
+    if n == 'vr' or any(kw in n for kw in ['precio', 'valor', 'total', 'importe', 'subtotal',
+                                            'vr.', ' vr', 'monto', 'vlr', 'unitari']):
         return 'price'
     if any(kw in n for kw in ['cant', 'cantidad', 'unidades', 'cajas', 'und']):
         return 'qty'
